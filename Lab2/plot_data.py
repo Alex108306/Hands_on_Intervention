@@ -20,7 +20,7 @@ with open('data/error_record_DLS.txt', 'r') as f:
         error_record_DLS.append(float(line.strip()))
 
 # Plotting the error records for each method
-dt = 0.01 # Simulation time
+dt = 1.0/60.0 # Simulation time
 time_Pseudoinverse = np.arange(len(error_record_Pseudoinverse)) * dt # Time params for plotting in x axis for Pseudoinverse
 time_transpose = np.arange(len(error_record_transpose)) * dt # Time params for plotting in x axis for transpose
 time_DLS = np.arange(len(error_record_DLS)) * dt # Time params for plotting in x axis for DLS

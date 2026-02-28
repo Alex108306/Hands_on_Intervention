@@ -66,13 +66,13 @@ animation = anim.FuncAnimation(fig, simulate, tt,
 
 plt.show()
 
-# Plot joint angles
+# Plot joint positions
 t_rec = np.arange(len(q1_record)) * dt # Time vector for recorded joint angles
 plt.plot(t_rec, q1_record, label='q1')
 plt.plot(t_rec, q2_record, label='q2')
 plt.legend()
-plt.title('Joint angles')
-plt.xlabel('Time [s]')
-plt.ylabel('Joint angle [rad]')
+plt.title('Joint position')
+plt.xlabel('Time[s]')
+plt.ylabel('Angle[rad]')
 plt.grid()
 plt.show()

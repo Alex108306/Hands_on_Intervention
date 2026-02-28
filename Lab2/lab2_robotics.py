@@ -17,7 +17,10 @@ def DH(d, theta, a, alpha):
     (Numpy array): composition of elementary DH transformations
     """
     # 1. Build matrices representing elementary transformations (based on input parameters).
-    T_d = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, d], [0, 0, 0, 1]]) 
+    T_d = np.array([[1, 0, 0, 0], 
+                    [0, 1, 0, 0], 
+                    [0, 0, 1, d], 
+                    [0, 0, 0, 1]]) 
     T_theta = np.array(
         [
             [cos(theta), -sin(theta), 0, 0],
@@ -26,7 +29,10 @@ def DH(d, theta, a, alpha):
             [0, 0, 0, 1],
         ]
     )
-    T_a = np.array([[1, 0, 0, a], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+    T_a = np.array([[1, 0, 0, a], 
+                    [0, 1, 0, 0], 
+                    [0, 0, 1, 0], 
+                    [0, 0, 0, 1]])
     T_alpha = np.array(
         [
             [1, 0, 0, 0],

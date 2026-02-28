@@ -52,19 +52,19 @@ def simulate(t):
     # Update control
     sigma = T[-1][0:2, 3]        # Position of the end-effector
     err = np.array([sigma_d - sigma]).T        # Control error
-    # err = np.vstack((err, np.zeros((4, 1)))) # Add zeros for orientation control (not implemented) Not Work as expected, need to check the dimension of err and J
-
+    
     # Calculate DLS
-    damping_factor = 0.1
+    damping_factor = 0.2
     DLS_matrix = DLS(J, damping_factor)
 
     # Calculate joint velocity
 
-    # dq = np.linalg.pinv(J) @ err  # Control solution using Pseudoinverse
+    # dq = np.linalg.pinv(J) @ (K @ err)  # Control solution using Pseudoinverse
 
-    # dq = J.T @ err # Control solution using Transpose
+    # dq = J.T @ (K @ err) # Control solution using Transpose
 
-    dq = DLS_matrix @ err  # Control solution using DLS
+    dq = DLS_matrix @ (K @ err)  # Control solution using DLS
+
 
     dq = np.array([dq[0][0], dq[1][0]]) # Get two joint velocities
     q += dt * dq
