@@ -12,6 +12,11 @@ alpha = np.zeros(3)                        # rotation around X-axis
 revolute = np.array([True, True, True])          # flags specifying the type of joints
 K = np.diag([1, 1]) # Control gain matrix
 
+# Record the motion of three joints
+q1_record = [q[0]]
+q2_record = [q[1]]
+q3_record = [q[2]]
+
 # Setting desired position of end-effector to the current one
 T = kinematics(d, q.flatten(), a, alpha) # flatten() needed if q defined as column vector !
 sigma_d = T[-1][0:2,3].reshape(2,1)
@@ -60,7 +65,9 @@ def simulate(t):
     dq = np.linalg.pinv(Jbar) @ (K @ err) + P @ y                    # Control signal
     q = q.reshape(3,1) + dt * dq # Simulation update
     q = q.flatten()
-    
+    q1_record.append(q[0])
+    q2_record.append(q[1])
+    q3_record.append(q[2])
 
     # Update drawing
     PP = robotPoints2D(T)
@@ -75,4 +82,16 @@ def simulate(t):
 # Run simulation
 animation = anim.FuncAnimation(fig, simulate, np.arange(0, 60, dt), 
                                 interval=10, blit=True, init_func=init, repeat=False)
+plt.show()
+
+# Plot joint positions
+t_rec = np.arange(len(q1_record)) * dt # Time vector for recorded joint angles
+plt.plot(t_rec, q1_record, label='q1')
+plt.plot(t_rec, q2_record, label='q2')
+plt.plot(t_rec, q3_record, label='q3')
+plt.legend()
+plt.title('Joint position')
+plt.xlabel('Time[s]')
+plt.ylabel('Angle[rad]')
+plt.grid()
 plt.show()

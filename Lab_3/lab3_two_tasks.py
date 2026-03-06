@@ -9,8 +9,13 @@ q = np.array([0.2, 0.5, 0.2])                            # rotation around Z-axi
 a = np.array([0.5, 0.5, 0.5])                   # displacement along X-axis
 alpha = np.zeros(3)                        # rotation around X-axis 
 revolute = np.array([True, True, True])          # flags specifying the type of joints
-K1 = np.diag([1, 1]) # Control gain matrix
-K2 = np.diag([1])
+K1 = np.diag([1, 1]) # Control gain matrix for the first task
+K2 = np.diag([1]) # Control gain matrix for the second task
+dq_max = np.array([0.9, 1.0, 0.9]) # Maximum joint velocities
+
+# Record error of ee and joint 1 position
+err1_record = []
+joint_1_record = []
 
 # Desired values of task variables
 sigma1_d = np.array([0.0, 1.0]).reshape(2,1) # Position of the end-effector
@@ -75,8 +80,17 @@ def simulate(t):
     dq1 = DLS_matrix_J1 @ (K1 @ err1)                    # Velocity for the first task
     dq12 = dq1 + DLS_matrix_J2 @ ((K2 @ err2) - J2 @ dq1)                  # Velocity for both tasks
 
+    s = np.max(np.abs(dq12) / dq_max) # Scaling factor to ensure joint velocity limits are not exceeded
+    if s > 1:
+        dq12 = dq12 / s
+    else:
+        dq12 = dq12
+
     q = q.reshape(3,1) + dq12 * dt # Simulation update
     q = q.flatten()
+
+    err1_record.append(np.linalg.norm(err1))
+    joint_1_record.append(abs(q[0]))
 
     # Update drawing
     PP = robotPoints2D(T)
@@ -91,4 +105,15 @@ def simulate(t):
 # Run simulation
 animation = anim.FuncAnimation(fig, simulate, np.arange(0, 10, dt), 
                                 interval=10, blit=True, init_func=init, repeat=True)
+plt.show()
+
+# Plot error of end-effector and joint 1 position
+t_rec = np.arange(len(err1_record)) * dt # Time vector for recorded joint angles
+plt.plot(t_rec, err1_record, label='e1 (end-effector position)')
+plt.plot(t_rec, joint_1_record, label='e2 (joint 1 position)')
+plt.legend()
+plt.title('Task-Priority (two tasks)')
+plt.xlabel('Time[s]')
+plt.ylabel('Error[1]')
+plt.grid()
 plt.show()
