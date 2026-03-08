@@ -6,10 +6,10 @@ import math
 
 # Robot definition (3 revolute joint planar manipulator)
 d = np.zeros(3)                            # displacement along Z-axis
-q = np.array([0.2, 0.5, 0.2])                            # rotation around Z-axis (theta)
-a = np.array([0.5, 0.5, 0.5])                   # displacement along X-axis
+q = np.array([0.2, 0.5, 0.2])              # rotation around Z-axis (theta)
+a = np.array([0.5, 0.5, 0.5])              # displacement along X-axis
 alpha = np.zeros(3)                        # rotation around X-axis 
-revolute = np.array([True, True, True])          # flags specifying the type of joints
+revolute = np.array([True, True, True])    # flags specifying the type of joints
 K = np.diag([1, 1]) # Control gain matrix
 
 # Record the motion of three joints
@@ -22,8 +22,8 @@ T = kinematics(d, q.flatten(), a, alpha) # flatten() needed if q defined as colu
 sigma_d = T[-1][0:2,3].reshape(2,1)
 
 # Simulation params
-dt = 1.0/60.0
-Tt = 10 # Total simulation time
+dt = 1.0/60.0             # Time step
+Tt = 10                   # Total simulation time
 tt = np.arange(0, Tt, dt) # Simulation time vector
 
 # Drawing preparation
@@ -57,14 +57,16 @@ def simulate(t):
     J = jacobian(T, revolute)
     
     # Update control
-    sigma = T[-1][0:2, 3].reshape(2,1)               # Current position of the end-effector
-    err = sigma_d - sigma                   # Error in position
-    Jbar = J[0:2][:]                  # Task Jacobian
-    P = (np.identity(3) - np.linalg.pinv(Jbar) @ Jbar)                     # Null space projector
-    y = np.array([sin(t), cos(t), sin(t)*cos(t)]).reshape(3,1)                    # Arbitrary joint velocity
-    dq = np.linalg.pinv(Jbar) @ (K @ err) + P @ y                    # Control signal
-    q = q.reshape(3,1) + dt * dq # Simulation update
+    sigma = T[-1][0:2, 3].reshape(2,1)                       # Current position of the end-effector
+    err = sigma_d - sigma                                    # Error in position
+    Jbar = J[0:2][:]                                         # Task Jacobian
+    P = (np.identity(3) - np.linalg.pinv(Jbar) @ Jbar)       # Null space projector
+    y = np.array([sin(t), sin(2*t), sin(3*t)]).reshape(3,1)  # Arbitrary joint velocity
+    dq = np.linalg.pinv(Jbar) @ (K @ err) + P @ y            # Control signal
+    q = q.reshape(3,1) + dt * dq                             # Simulation update
     q = q.flatten()
+
+    # Record position of joints
     q1_record.append(q[0])
     q2_record.append(q[1])
     q3_record.append(q[2])

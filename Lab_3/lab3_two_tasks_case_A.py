@@ -63,28 +63,28 @@ def simulate(t):
 
     # Update control
     # TASK 1
-    sigma1 = T[-1][0:2, 3].reshape((2,1))                # Current position of the end-effector
-    err1 = sigma1_d - sigma1                  # Error in Cartesian position
-    J1 = J[0:2][:]                    # Jacobian of the first task
+    sigma1 = T[-1][0:2, 3].reshape((2,1))             # Current position of the end-effector
+    err1 = sigma1_d - sigma1                          # Error in Cartesian position
+    J1 = J[0:2][:]                                    # Jacobian of the first task
     DLS_matrix_J1 = DLS(J1, damping_factor)
-    P1 = (np.identity(3) - np.linalg.pinv(J1) @ J1)                         # Null space projector
+    P1 = (np.identity(3) - np.linalg.pinv(J1) @ J1)   # Null space projector
     
     # TASK 2
-    sigma2 = q[0]                # Current position of joint 1
-    err2 = sigma2_d - sigma2                  # Error in joint position
-    J2 = np.array([1, 0, 0]).reshape(1,3)               # Jacobian of the second task
-    J2bar = J2 @ P1                  # Augmented Jacobian
+    sigma2 = q[0]                           # Current position of joint 1
+    err2 = sigma2_d - sigma2                # Error in joint position
+    J2 = np.array([1, 0, 0]).reshape(1,3)   # Jacobian of the second task
+    J2bar = J2 @ P1                         # Augmented Jacobian
     DLS_matrix_J2 = DLS(J2bar, damping_factor)
     
     # Combining tasks
-    dq1 = DLS_matrix_J1 @ (K1 @ err1)                    # Velocity for the first task
-    dq12 = dq1 + DLS_matrix_J2 @ ((K2 @ err2) - J2 @ dq1)                  # Velocity for both tasks
+    dq1 = DLS_matrix_J1 @ (K1 @ err1)                      # Velocity for the first task
+    dq12 = dq1 + DLS_matrix_J2 @ ((K2 @ err2) - J2 @ dq1)  # Velocity for both tasks
 
     s = np.max(np.abs(dq12) / dq_max) # Scaling factor to ensure joint velocity limits are not exceeded
     if s > 1:
-        dq12 = dq12 / s
+        dq12 = dq12 / s # Scale down the velocity to respect joint limits
     else:
-        dq12 = dq12
+        dq12 = dq12 # No scaling needed
 
     q = q.reshape(3,1) + dq12 * dt # Simulation update
     q = q.flatten()
