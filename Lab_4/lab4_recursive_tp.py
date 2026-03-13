@@ -11,12 +11,18 @@ revolute = np.array([True, True, True])    # flags specifying the type of joints
 robot = Manipulator(d, theta, a, alpha, revolute) # Manipulator object
 damping_factor = 0.1
 
+# Three gain matrices for first task
+Kp1 = np.diag([0.5, 0.5]) # Gain matrix for end-effector position control
+Kp2 = np.diag([2, 2]) # Gain matrix for end-effector position control
+Kp3 = np.diag([5, 5]) # Gain matrix for end-effector position control
+Kp = Kp3 # We can test with Kp1, Kp2, or Kp3 to see the effect of gain matrix on the convergence speed
+
 # Task hierarchy definition
 tasks = [ 
-            Position2D("End-effector position", np.array([1.0, 0.5]).reshape(2,1)),
-            # Orientation2D("End-effector orientation", np.pi/2),
-            # Configuration2D("Configuration", np.array([1.0, 0.5, np.pi/2]).reshape(3,1)),
-            JointPosition("Joint position", 0, 0)
+            Position2D("End-effector position", np.array([1.0, 0.5]).reshape(2,1), link_index = 3),
+            Orientation2D("End-effector orientation", 0, link_index = 2),
+            # Configuration2D("Configuration", np.array([1.0, 0.5, np.pi/2]).reshape(3,1), 3),
+            # JointPosition("Joint position", 0, 0)
         ] 
 
 # Simulation params
@@ -49,6 +55,7 @@ def init():
     point.set_data([], [])
     if len(tasks[0].getDesired()) == 2:
         tasks[0].setDesired((np.random.rand(2,1)*2-1)) # Random target
+        tasks[0].setGainMatrixK(Kp) # Set gain matrix for the first task
     else:
         angle = np.array([tasks[0].getDesired()[-1]])
         sigma_d = np.hstack((np.random.rand(1,2)*2-1, angle))
@@ -70,10 +77,14 @@ def simulate(t):
     for i in range(len(tasks)):
         # Update task state
         tasks[i].update(robot)
+        # Padding Jacobian to match the dimension of the robot dof and compute the augmented Jacobian, then compute the DLS solution and accumulate velocity, and finally update the null-space projector
+        Jacobian_padded = np.pad(tasks[i].getJacobian(), ((0, 0), (0, robot.dof - tasks[i].getJacobian().shape[1])))
         # Compute augmented Jacobian
-        J_bar = tasks[i].getJacobian() @ P
+        J_bar = Jacobian_padded @ P
+        # Task definition
+        x_dot = tasks[i].getFeedforwardVelocity() + tasks[i].getGainMatrixK() @ tasks[i].getError()
         # Compute task velocity & Accumulate velocity
-        dq = dq + DLS(J_bar, damping_factor) @ (tasks[i].getError() - tasks[i].getJacobian() @ dq)
+        dq = dq + DLS(J_bar, damping_factor) @ (x_dot - Jacobian_padded @ dq)
         # Update null-space projector
         P = P - np.linalg.pinv(J_bar) @ J_bar
     ###
@@ -86,10 +97,10 @@ def simulate(t):
         error_end_effector.append(np.linalg.norm(tasks[0].getError()[0:2]))
     elif len(tasks) > 1 and tasks[1].name == "Joint position":
         error_end_effector.append(np.linalg.norm(tasks[0].getError()[0:2]))
-        error_joint_position.append(abs(tasks[1].getError()))
+        error_joint_position.append(abs(tasks[1].getError()[0]))
     elif len(tasks) > 1 and tasks[1].name == "End-effector orientation":
         error_end_effector.append(np.linalg.norm(tasks[0].getError()[0:2]))
-        error_end_effector_orientation.append(abs(tasks[1].getError())) 
+        error_end_effector_orientation.append(abs(tasks[1].getError()[0])) 
 
 
     # Update robot
@@ -114,19 +125,19 @@ plt.show()
 tvec = np.arange(0, len(error_end_effector)*dt, dt)
 plt.figure()
 if tasks[0].name == "Configuration":
-    plt.plot(tvec, error_end_effector, label='End-effector position error')
-    plt.plot(tvec, error_end_effector_orientation, label='End-effector orientation error')
+    plt.plot(tvec, error_end_effector, label='e1 (end-effector position)')
+    plt.plot(tvec, error_end_effector_orientation, label='e2 (end-effector orientation)')
 elif len(tasks) == 1 and tasks[0].name == "End-effector position":
-    plt.plot(tvec, error_end_effector, label='End-effector position error')
+    plt.plot(tvec, error_end_effector, label='e1 (end-effector position)')
 elif len(tasks) > 1 and tasks[1].name == "Joint position":
-    plt.plot(tvec, error_end_effector, label='End-effector position error')
-    plt.plot(tvec, error_joint_position, label='Joint position error')
+    plt.plot(tvec, error_end_effector, label='e1 (end-effector position)')
+    plt.plot(tvec, error_joint_position, label='e2 (joint 1 position)')
 elif len(tasks) > 1 and tasks[1].name == "End-effector orientation":
-    plt.plot(tvec, error_end_effector, label='End-effector position error')
-    plt.plot(tvec, error_end_effector_orientation, label='End-effector orientation error')
-plt.xlabel('Time step')
-plt.ylabel('Error')
-plt.title('Task Errors')
+    plt.plot(tvec, error_end_effector, label='e1 (end-effector position)')
+    plt.plot(tvec, error_end_effector_orientation, label='e2 (joint 2 orientation)')
+plt.xlabel('Time[s]')
+plt.ylabel('Error[1]')
+plt.title('Task-Priority (two tasks) with gain matrix K = ' + str(Kp[0,0]) + ', ' + str(Kp[1,1]) + ' (first task)')
 plt.legend()
 plt.grid()
 plt.show()

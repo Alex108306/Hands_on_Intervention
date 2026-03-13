@@ -15,11 +15,10 @@ def jacobianLink(T, revolute, link): # Needed in Exercise 2
         (Numpy array): end-effector Jacobian
     '''
     # 1. Initialize J and O.
-    n_dof = len(revolute)
-    J = np.zeros((6, n_dof - link + 1))
+    J = np.zeros((6, link))
     O = T[-1][0:3, 3]
     # 2. For each joint of the robot
-    for i in range(link-1, n_dof):
+    for i in range(0, link):
         #   a. Extract z and o.
         i_1_T_i = T[i]
         z = i_1_T_i[0:3, 2]
@@ -93,6 +92,18 @@ class Manipulator:
     '''
     def getEETransform(self):
         return self.T[-1]
+    
+    '''
+        Method that returns the transformation of a selected link.
+    '''
+    def getLinkTransform(self, link):
+        return self.T[link]
+    
+    '''
+        Method that returns the Jacobian of a selected link.
+    '''
+    def getLinkJacobian(self, link):
+        return jacobianLink(self.T, self.revolute, link)
 
     '''
         Method that returns the position of a selected joint.
@@ -126,6 +137,8 @@ class Task:
     def __init__(self, name, desired):
         self.name = name # task title
         self.sigma_d = desired # desired sigma
+        self.ff_vel = None
+        self.gain_matrix_K = None
         
     '''
         Method updating the task variables (abstract).
@@ -151,6 +164,36 @@ class Task:
     def getDesired(self):
         return self.sigma_d
 
+    ''' 
+        Method setting the feedforward velocity.
+
+        Arguments:
+        value(Numpy array): value of the feedforward velocity vector
+    '''
+    def setFeedforwardVelocity(self, value):
+        self.ff_vel = value
+    
+    '''
+        Method returning the feedforward velocity vector.
+    '''
+    def getFeedforwardVelocity(self):
+        return self.ff_vel
+    
+    ''' 
+        Method setting the gain matrix K.
+
+        Arguments:
+        value(Numpy array): value of the gain matrix K
+    '''
+    def setGainMatrixK(self, value):
+        self.gain_matrix_K = value
+    
+    '''
+        Method returning the gain matrix K.
+    '''
+    def getGainMatrixK(self):
+        return self.gain_matrix_K
+
     '''
         Method returning the task Jacobian.
     '''
@@ -167,28 +210,35 @@ class Task:
     Subclass of Task, representing the 2D position task.
 '''
 class Position2D(Task):
-    def __init__(self, name, desired):
+    def __init__(self, name, desired, link_index):
         super().__init__(name, desired)
         self.err = np.zeros(desired.shape) # Initialize with proper dimensions
+        self.link_index = link_index
+        self.ff_vel = np.zeros(desired.shape) # Initialize feedforward velocity
+        self.gain_matrix_K = np.eye(desired.shape[0]) # Initialize gain matrix K
         
     def update(self, robot):
-        self.J = robot.getEEJacobian()[0:2,:]   # Update task Jacobian
-        self.err = self.getDesired() - robot.getEETransform()[0:2, 3].reshape(2,1)# Update task error
+        self.J = robot.getLinkJacobian(self.link_index)[0:2,:]   # Update task Jacobian
+        self.err = self.getDesired() - robot.getLinkTransform(self.link_index)[0:2, 3].reshape(2,1)# Update task error
         
 '''
     Subclass of Task, representing the 2D orientation task.
 '''
 class Orientation2D(Task):
-    def __init__(self, name, desired):
+    def __init__(self, name, desired, link_index):
         super().__init__(name, desired)
         self.err = 0.0 # Initialize with proper dimensions
-        
+        self.link_index = link_index
+        self.ff_vel = np.zeros(1) # Initialize feedforward velocity
+        self.gain_matrix_K = np.eye(1) # Initialize gain matrix K
+
     def update(self, robot):
-        self.J = robot.getEEJacobian()[5, :].reshape(1, robot.dof) # Update task Jacobian
+        self.J = robot.getLinkJacobian(self.link_index)[5, :].reshape(1, self.link_index) # Update task Jacobian
         rotation_matrix_desired = R.from_euler('z', self.getDesired()).as_matrix()
         w_d, epsilon_d = self.quaternion_from_rotation_matrix(rotation_matrix_desired)
-        w, epsilon = self.quaternion_from_rotation_matrix(robot.getEETransform()[0:3, 0:3])
+        w, epsilon = self.quaternion_from_rotation_matrix(robot.getLinkTransform(self.link_index)[0:3, 0:3])
         self.err = (w * epsilon_d - w_d * epsilon - np.cross(epsilon, epsilon_d))[-1]# Update task error
+        self.err = np.array(self.err).reshape(1, 1) # Reshape error to be a column vector
 
     def quaternion_from_rotation_matrix(self, orientation_matrix):
         orientation_matrix = R.from_matrix(orientation_matrix)
@@ -201,17 +251,21 @@ class Orientation2D(Task):
     Subclass of Task, representing the 2D configuration task.
 '''
 class Configuration2D(Task):
-    def __init__(self, name, desired):
+    def __init__(self, name, desired, link_index):
         super().__init__(name, desired)
         self.err = np.zeros(desired.shape)# Initialize with proper dimensions
-        
+        self.link_index = link_index
+        self.ff_vel = np.zeros(desired.shape) # Initialize feedforward velocity
+        self.gain_matrix_K = np.eye(desired.shape[0]) # Initialize gain matrix K
+
     def update(self, robot):
-        self.J = np.vstack((robot.getEEJacobian()[0:2,:], robot.getEEJacobian()[5, :]))# Update task Jacobian
+        self.J = np.vstack((robot.getLinkJacobian(self.link_index)[0:2,:], robot.getLinkJacobian(self.link_index)[5, :])).reshape(3, self.link_index)# Update task Jacobian
         rotation_matrix_desired = R.from_euler('z', self.getDesired()[-1]).as_matrix()
         w_d, epsilon_d = self.quaternion_from_rotation_matrix(rotation_matrix_desired)
-        w, epsilon = self.quaternion_from_rotation_matrix(robot.getEETransform()[0:3, 0:3])
-        self.err = np.vstack((self.getDesired()[0:2].reshape(2,1) - robot.getEETransform()[0:2, 3].reshape(2,1), 
+        w, epsilon = self.quaternion_from_rotation_matrix(robot.getLinkTransform(self.link_index)[0:3, 0:3])
+        self.err = np.vstack((self.getDesired()[0:2].reshape(2,1) - robot.getLinkTransform(self.link_index)[0:2, 3].reshape(2,1), 
                               (w * epsilon_d - w_d * epsilon - np.cross(epsilon, epsilon_d))[-1]))# Update task error
+        self.err = self.err.reshape(3, 1) # Reshape error to be a column vector
 
     def quaternion_from_rotation_matrix(self, orientation_matrix):
         orientation_matrix = R.from_matrix(orientation_matrix)
@@ -228,9 +282,12 @@ class JointPosition(Task):
         super().__init__(name, desired)
         self.err = 0.0
         self.index = index
+        self.ff_vel = np.zeros(1) # Initialize feedforward velocity
+        self.gain_matrix_K = np.eye(1) # Initialize gain matrix K
 
         
     def update(self, robot):
         self.J = np.zeros((1, robot.getDOF())) # Update task Jacobian
         self.J[0, self.index] = 1
-        self.err = self.getDesired() - robot.getJointPos(self.index)
+        self.err = self.getDesired() - robot.getJointPos(self.index) # Update task error
+        self.err = np.array(self.err).reshape(1, 1) # Reshape error to be a column vector
