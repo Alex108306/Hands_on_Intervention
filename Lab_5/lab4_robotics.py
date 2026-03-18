@@ -137,6 +137,7 @@ class Task:
     def __init__(self, name, desired):
         self.name = name # task title
         self.sigma_d = desired # desired sigma
+        self.a = 0 # Activation value
         self.ff_vel = None
         self.gain_matrix_K = None
         
@@ -205,6 +206,12 @@ class Task:
     '''    
     def getError(self):
         return self.err
+    
+    '''
+        Method checking the active state.
+    '''    
+    def isActivate(self) -> bool:
+        return self.a
 
 '''
     Subclass of Task, representing the 2D position task.
@@ -216,6 +223,7 @@ class Position2D(Task):
         self.link_index = link_index # Index of the link for which the task is defined
         self.ff_vel = np.zeros(desired.shape) # Initialize feedforward velocity
         self.gain_matrix_K = np.eye(desired.shape[0]) # Initialize gain matrix K
+        self.a = 1 # Initialize activate value of task
         
     def update(self, robot):
         self.J = robot.getLinkJacobian(self.link_index)[0:2,:]   # Update task Jacobian
@@ -231,6 +239,7 @@ class Orientation2D(Task):
         self.link_index = link_index # Index of the link for which the task is defined
         self.ff_vel = np.zeros(1) # Initialize feedforward velocity
         self.gain_matrix_K = np.eye(1) # Initialize gain matrix K
+        self.a = 1 # Initialize activate value of task
 
     def update(self, robot):
         self.J = robot.getLinkJacobian(self.link_index)[5, :].reshape(1, self.link_index) # Update task Jacobian
@@ -258,6 +267,7 @@ class Configuration2D(Task):
         self.link_index = link_index # Index of the link for which the task is defined
         self.ff_vel = np.zeros(desired.shape) # Initialize feedforward velocity
         self.gain_matrix_K = np.eye(desired.shape[0]) # Initialize gain matrix K
+        self.a = 1 # Initialize activate value of task
 
     def update(self, robot):
         self.J = np.vstack((robot.getLinkJacobian(self.link_index)[0:2,:], robot.getLinkJacobian(self.link_index)[5, :])).reshape(3, self.link_index)# Update task Jacobian
@@ -275,6 +285,7 @@ class Configuration2D(Task):
         epsilon = quaternion[1:4]
 
         return w, epsilon
+
 ''' 
     Subclass of Task, representing the joint position task.
 '''
@@ -285,10 +296,53 @@ class JointPosition(Task):
         self.index = index # Index of the joint for which the task is defined
         self.ff_vel = np.zeros(1) # Initialize feedforward velocity
         self.gain_matrix_K = np.eye(1) # Initialize gain matrix K
-
-        
+        self.a = 1 # Initialize activate value of task
+      
     def update(self, robot):
         self.J = np.zeros((1, robot.getDOF())) # Update task Jacobian
         self.J[0, self.index] = 1 # Set the column corresponding to the joint index to 1
         self.err = self.getDesired() - robot.getJointPos(self.index) # Update task error
         self.err = np.array(self.err).reshape(1, 1) # Reshape error to be a column vector
+
+''' 
+    Subclass of Task, representing the obstacle task.
+'''
+class Obstacle2D(Task):
+    def __init__(self, name, obstacle_pos, obs_boundary):
+        super().__init__(name, obstacle_pos)
+        self.err = 0.0 # Initialize with proper dimensions
+        self.ff_vel = np.zeros(len(obstacle_pos)).reshape(2, 1) # Initialize feedforward velocity
+        self.gain_matrix_K = np.eye(len(obstacle_pos)) # Initialize gain matrix K
+        self.radius_alpha = obs_boundary[0]
+        self.radius_gamma = obs_boundary[1]
+        
+    def update(self, robot):
+        self.J = robot.getLinkJacobian(3)[0:2, :] # Update task Jacobian
+        dist_ee_obs = robot.getLinkTransform(3)[0:2, 3].reshape(2,1) - self.getDesired().reshape(2,1)
+        self.err = dist_ee_obs/(abs(dist_ee_obs))
+        if self.isActivate() == 0 and np.linalg.norm(dist_ee_obs) <= self.radius_alpha:
+            self.a = 1
+        elif self.isActivate() == 1 and np.linalg.norm(dist_ee_obs) >= self.radius_gamma:
+            self.a = 0
+
+''' 
+    Subclass of Task, representing the obstacle task.
+'''
+class JointLimit(Task):
+    def __init__(self, name, safe_set, index):
+        super().__init__(name, safe_set)
+        self.err = 0.0 # Initialize with proper dimensions
+        self.index = index
+        self.ff_vel = np.zeros(1).reshape(1, 1) # Initialize feedforward velocity
+        self.gain_matrix_K = np.eye(1) # Initialize gain matrix K
+        self.alpha = 0.1
+        self.gamma = 0.2
+        
+    def update(self, robot):
+        self.J = np.zeros((1, robot.getDOF())) # Update task Jacobian
+        self.J[0, self.index] = 1 # Set the column corresponding to the joint index to 1
+        self.err = 1
+        joint_pos = robot.getJointPos(self.index)
+        if self.isActivate() == 0 and joint_pos >= (self.getDesired()[1] - self.alpha):
+            self.a = -1
+        elif self.isActivate() == 0 and joint_pos >= (self.getDesired()[1] - self.alpha):
