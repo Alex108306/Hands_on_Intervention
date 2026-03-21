@@ -13,17 +13,10 @@ robot = Manipulator(d, theta, a, alpha, revolute) # Manipulator object
 damping_factor = 0.1
 
 # Task hierarchy definition
-obstacle_pos_1 = np.array([0.0, 1.0]).reshape(2,1)
-obstacle_pos_2 = np.array([-0.5, -0.6]).reshape(2,1)
-obstacle_pos_3 = np.array([0.75, -0.5]).reshape(2,1)
-obstacle_r_1 = 0.5
-obstacle_r_2 = 0.4
-obstacle_r_3 = 0.3
+joint_limit_1 = np.array([-0.5, 0.5])
 
 tasks = [ 
-          Obstacle2D("Obstacle avoidance", obstacle_pos_1, np.array([obstacle_r_1+0.01, obstacle_r_1+0.02])),
-          Obstacle2D("Obstacle avoidance", obstacle_pos_2, np.array([obstacle_r_2+0.01, obstacle_r_2+0.02])),
-          Obstacle2D("Obstacle avoidance", obstacle_pos_3, np.array([obstacle_r_3+0.01, obstacle_r_3+0.02])),
+          JointLimit("Joint Limit", joint_limit_1, 0),
           Position2D("End-effector position", np.array([-1.0, 1.0]).reshape(2,1), 3)
         ] 
 
@@ -32,9 +25,7 @@ dt = 1.0/60.0
 
 # Record the data for plotting
 error_end_effector = []
-error_obstacle_1 = []
-error_obstacle_2 = []
-error_obstacle_3 = []
+joint_1_position = []
 
 # Drawing preparation
 fig = plt.figure()
@@ -44,9 +35,6 @@ ax.set_aspect('equal')
 ax.grid()
 ax.set_xlabel('x[m]')
 ax.set_ylabel('y[m]')
-ax.add_patch(patch.Circle(obstacle_pos_1.flatten(), obstacle_r_1, color='red', alpha=0.3))
-ax.add_patch(patch.Circle(obstacle_pos_2.flatten(), obstacle_r_2, color='green', alpha=0.3))
-ax.add_patch(patch.Circle(obstacle_pos_3.flatten(), obstacle_r_3, color='purple', alpha=0.3))
 line, = ax.plot([], [], 'o-', lw=2) # Robot structure
 path, = ax.plot([], [], 'c-', lw=1) # End-effector path
 point, = ax.plot([], [], 'rx') # Target
@@ -60,7 +48,7 @@ def init():
     line.set_data([], [])
     path.set_data([], [])
     point.set_data([], [])
-    tasks[3].setDesired((np.random.rand(2,1)*2-1)) # Random target
+    tasks[1].setDesired((np.random.rand(2,1)*2-1)) # Random target
     return line, path, point
 
 # Simulation loop
@@ -98,10 +86,8 @@ def simulate(t):
     ###
 
     # Record data for plotting
-    error_end_effector.append(np.linalg.norm(tasks[3].getError()))
-    error_obstacle_1.append(np.linalg.norm(robot.getEETransform()[0:2,3] - obstacle_pos_1.flatten()) - obstacle_r_1)
-    error_obstacle_2.append(np.linalg.norm(robot.getEETransform()[0:2,3] - obstacle_pos_2.flatten()) - obstacle_r_2)
-    error_obstacle_3.append(np.linalg.norm(robot.getEETransform()[0:2,3] - obstacle_pos_3.flatten()) - obstacle_r_3)
+    error_end_effector.append(np.linalg.norm(tasks[1].getError()))
+    joint_1_position.append(robot.getJointPos(0)[0])
 
     # Update robot
     robot.update(dq, dt)
@@ -112,7 +98,7 @@ def simulate(t):
     PPx.append(PP[0,-1])
     PPy.append(PP[1,-1])
     path.set_data(PPx, PPy)
-    point.set_data(tasks[3].getDesired()[0], tasks[3].getDesired()[1])
+    point.set_data(tasks[1].getDesired()[0], tasks[1].getDesired()[1])
     
     return line, path, point
 
@@ -124,13 +110,13 @@ plt.show()
 # Plotting the end-effector path and distance to the obstacles
 tvec = np.arange(0, len(error_end_effector)*dt, dt)
 plt.figure()
-plt.plot(tvec, error_obstacle_1, label='d_1 (distance to obstacle)', color='red')
-plt.plot(tvec, error_obstacle_2, label='d_2 (distance to obstacle)', color='green')
-plt.plot(tvec, error_obstacle_3, label='d_3 (distance to obstacle)', color='purple')
 plt.plot(tvec, error_end_effector, label='e_1 (end-effector position error)', color='blue')
+plt.plot(tvec, joint_1_position, label='q_1 (position of joint 1)', color='orange')
+plt.plot(tvec, np.ones_like(tvec)*joint_limit_1[0], color='red', linestyle='--')
+plt.plot(tvec, np.ones_like(tvec)*joint_limit_1[1], color='red', linestyle='--')
 plt.xlabel('Time[s]')
 plt.ylabel('Error[1]')
-plt.title('Task-Priority inequality tasks')
+plt.title('Task-Priority control')
 plt.legend()
 plt.grid()
 plt.show()

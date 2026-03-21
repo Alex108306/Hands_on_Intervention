@@ -335,14 +335,19 @@ class JointLimit(Task):
         self.index = index
         self.ff_vel = np.zeros(1).reshape(1, 1) # Initialize feedforward velocity
         self.gain_matrix_K = np.eye(1) # Initialize gain matrix K
-        self.alpha = 0.1
-        self.gamma = 0.2
+        self.alpha = 0.02
+        self.gamma = 0.05
         
     def update(self, robot):
         self.J = np.zeros((1, robot.getDOF())) # Update task Jacobian
         self.J[0, self.index] = 1 # Set the column corresponding to the joint index to 1
-        self.err = 1
+        self.err = np.array([[1]])
         joint_pos = robot.getJointPos(self.index)
         if self.isActivate() == 0 and joint_pos >= (self.getDesired()[1] - self.alpha):
             self.a = -1
-        elif self.isActivate() == 0 and joint_pos >= (self.getDesired()[1] - self.alpha):
+        elif self.isActivate() == 0 and joint_pos <= (self.getDesired()[0] + self.alpha):
+            self.a = 1
+        elif self.isActivate() == -1 and joint_pos <= (self.getDesired()[1] - self.gamma):
+            self.a = 0
+        elif self.isActivate() == 1 and joint_pos >= (self.getDesired()[0] + self.gamma):
+            self.a = 0
