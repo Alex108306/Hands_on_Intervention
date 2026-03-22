@@ -320,6 +320,8 @@ class Obstacle2D(Task):
         self.J = robot.getLinkJacobian(3)[0:2, :] # Update task Jacobian
         dist_ee_obs = robot.getLinkTransform(3)[0:2, 3].reshape(2,1) - self.getDesired().reshape(2,1)
         self.err = dist_ee_obs/(abs(dist_ee_obs))
+
+        # Task switching logic
         if self.isActivate() == 0 and np.linalg.norm(dist_ee_obs) <= self.radius_alpha:
             self.a = 1
         elif self.isActivate() == 1 and np.linalg.norm(dist_ee_obs) >= self.radius_gamma:
@@ -343,6 +345,8 @@ class JointLimit(Task):
         self.J[0, self.index] = 1 # Set the column corresponding to the joint index to 1
         self.err = np.array([[1]])
         joint_pos = robot.getJointPos(self.index)
+
+        # Task switching logic
         if self.isActivate() == 0 and joint_pos >= (self.getDesired()[1] - self.alpha):
             self.a = -1
         elif self.isActivate() == 0 and joint_pos <= (self.getDesired()[0] + self.alpha):
