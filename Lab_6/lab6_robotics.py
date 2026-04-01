@@ -18,7 +18,7 @@ class MobileManipulator:
         self.alpha = alpha
         self.revolute = revolute
         self.revoluteExt = np.concatenate([np.array([True, False]), self.revolute])        # List of joint types extended with base joints
-        self.r = 0.1                                                                       # Distance from robot centre to manipulator base
+        self.r = 0.15                                                                       # Distance from robot centre to manipulator base
         self.dof = len(self.revoluteExt)                                                   # Number of DOF of the system
         self.q = np.zeros((len(self.revolute),1))                                          # Vector of joint positions (manipulator)
         self.eta = np.zeros((3,1))                                                         # Vector of base pose (position & orientation)
@@ -41,15 +41,32 @@ class MobileManipulator:
                 self.d[i] = self.q[i][0]
 
         # Update mobile base pose
-        self.eta[0] += dQ[1] * np.cos(self.eta[2]) * dt
-        self.eta[1] += dQ[1] * np.sin(self.eta[2]) * dt
-        self.eta[2] += dQ[0] * dt
+
+        # First move forward. then rotate.
+        # self.eta[0][0] += dQ[1][0] * np.cos(self.eta[2][0]) * dt
+        # self.eta[1][0] += dQ[1][0] * np.sin(self.eta[2][0]) * dt
+        # self.eta[2][0] += dQ[0][0] * dt
+
+        # First rotate, then move forward. 
+        # self.eta[2][0] += dQ[0][0] * dt
+        # self.eta[0][0] += dQ[1][0] * np.cos(self.eta[2][0]) * dt
+        # self.eta[1][0] += dQ[1][0] * np.sin(self.eta[2][0]) * dt
+
+        # Simultaneous rotation and translation
+        if np.abs(dQ[0][0]) < 1e-6:
+            self.eta[0][0] += dQ[1][0] * np.cos(self.eta[2][0]) * dt
+            self.eta[1][0] += dQ[1][0] * np.sin(self.eta[2][0]) * dt
+        else:
+            self.eta[0][0] += (dQ[1][0] / dQ[0][0]) * (np.sin(self.eta[2][0] + dQ[0][0] * dt) - np.sin(self.eta[2][0]))
+            self.eta[1][0] += (dQ[1][0] / dQ[0][0]) * (-np.cos(self.eta[2][0] + dQ[0][0] * dt) + np.cos(self.eta[2][0]))
+        
+        self.eta[2][0] += dQ[0][0] * dt
 
 
         # Base kinematics
         R_b = np.array([[cos(self.eta[2][0]), -sin(self.eta[2][0]), 0],
                         [sin(self.eta[2][0]), cos(self.eta[2][0]), 0],
-                        [0, 0, 0]])
+                        [0, 0, 1]])
         Tb = np.array([[R_b[0, 0], R_b[0, 1], R_b[0, 2], self.eta[0][0]],
                        [R_b[1, 0], R_b[1, 1], R_b[1, 2], self.eta[1][0]],
                        [R_b[2, 0], R_b[2, 1], R_b[2, 2], 0],

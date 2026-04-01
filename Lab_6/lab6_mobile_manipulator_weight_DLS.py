@@ -15,15 +15,16 @@ damping_factor = 0.1
 
 # Task definition
 joint_limit_1 = np.array([-0.5, 0.5])
+W = np.diag([1.0, 1.0, 10.0, 0.5, 0.5])
 
 tasks = [ 
-          JointLimit("Joint Limit", joint_limit_1, 2),
-          Position2D("End-effector position", np.array([-0.5, 1.0]).reshape(2,1), 5)
+          Configuration2D("Configuration", np.array([1.0, 0.5, np.pi/2]).reshape(3,1), 5),
         ] 
 
 # Record the data for plotting
 error_end_effector = []
-joint_1_position = []
+error_end_effector_orientation = []
+joint_record = {}
 
 # Simulation params
 dt = 1.0/60.0
@@ -50,7 +51,9 @@ def init():
     line.set_data([], [])
     path.set_data([], [])
     point.set_data([], [])
-    tasks[1].setDesired((np.random.rand(2,1)*3-1.5)) # Random target
+    angle = np.array(np.pi - np.random.rand()*2*np.pi).reshape(1,1)
+    desired_position = np.random.rand(2,1)*3-1.5
+    tasks[0].setDesired(np.vstack([desired_position, angle])) # Random target
     return line, path, point
 
 # Simulation loop
@@ -78,7 +81,7 @@ def simulate(t):
             # Task definition
             x_dot = tasks[i].getFeedforwardVelocity() + tasks[i].getGainMatrixK() @ tasks[i].getError()
             # Compute task velocity & Accumulate velocity
-            dq = dq + DLS(J_bar, damping_factor) @ (tasks[i].a * x_dot - Jacobian_padded @ dq)
+            dq = dq + weighted_DLS(J_bar, damping_factor, W) @ (tasks[i].a * x_dot - Jacobian_padded @ dq)
             # Update null-space projector
             P = P - np.linalg.pinv(J_bar) @ J_bar
         else:
@@ -87,8 +90,11 @@ def simulate(t):
     ###
 
     # Record data for plotting
-    error_end_effector.append(np.linalg.norm(tasks[1].getError()))
-    joint_1_position.append(robot.getJointPos(2)[0])
+    error_end_effector.append(np.linalg.norm(tasks[0].getError()[0:2]))
+    error_end_effector_orientation.append(abs(tasks[0].getError()[2]))
+
+    for j in range(len(dq)):
+        joint_record[j] = joint_record.get(j, []) + [dq[j,0]]
 
     # Update robot
     robot.update(dq, dt)
@@ -100,7 +106,7 @@ def simulate(t):
     PPx.append(PP[0,-1])
     PPy.append(PP[1,-1])
     path.set_data(PPx, PPy)
-    point.set_data(tasks[1].getDesired()[0], tasks[1].getDesired()[1])
+    point.set_data(tasks[0].getDesired()[0], tasks[0].getDesired()[1])
     # -- Mobile base
     eta = robot.getBasePose()
     veh.set_transform(trans.Affine2D().rotate(eta[2,0]) + trans.Affine2D().translate(eta[0,0], eta[1,0]) + ax.transData)
@@ -115,12 +121,21 @@ plt.show()
 # Plotting the end-effector path and distance to the obstacles
 tvec = np.arange(0, len(error_end_effector)*dt, dt)
 plt.figure()
-plt.plot(tvec, joint_1_position, label='q_1 (position of joint 1)', color='blue')
-plt.plot(tvec, error_end_effector, label='e_2 (end-effector position error)', color='orange')
-plt.plot(tvec, np.ones_like(tvec)*joint_limit_1[0], color='red', linestyle='--')
-plt.plot(tvec, np.ones_like(tvec)*joint_limit_1[1], color='red', linestyle='--')
+plt.plot(tvec, error_end_effector, label='e1 (end-effector position)', color='orange')
+plt.plot(tvec, error_end_effector_orientation, label='e2 (end-effector orientation)', color='blue')
 plt.xlabel('Time[s]')
 plt.ylabel('Error[1]')
+plt.title('Task-Priority control')
+plt.legend()
+plt.grid()
+plt.show()
+
+# Plotting each joint velocity
+plt.figure()
+for j in range(len(joint_record)):
+    plt.plot(tvec, joint_record[j], label=f'joint {j+1} velocity')
+plt.xlabel('Time[s]')
+plt.ylabel('Velocity[1]')
 plt.title('Task-Priority control')
 plt.legend()
 plt.grid()

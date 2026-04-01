@@ -228,7 +228,6 @@ class Position2D(Task):
         
     def update(self, robot):
         self.J = robot.getLinkJacobian(self.link_index)[0:2,:]   # Update task Jacobian
-        print(self.J)
         self.err = self.getDesired() - robot.getLinkTransform(self.link_index)[0:2, 3].reshape(2,1)# Update task error
         
 '''

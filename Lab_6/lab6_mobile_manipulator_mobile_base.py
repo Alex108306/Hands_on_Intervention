@@ -14,16 +14,29 @@ robot = MobileManipulator(d, theta, a, alpha, revolute)
 damping_factor = 0.1
 
 # Task definition
-joint_limit_1 = np.array([-0.5, 0.5])
+W = np.diag([1.0, 1.0, 1.0, 1.0, 1.0])
+
+conf1 = np.array([1.5, 0.0, np.pi/2]).reshape(3,1)
+conf2 = np.array([1.0, 0.5, 2*np.pi/3]).reshape(3,1)
+conf3 = np.array([0.5, 1.0, 5*np.pi/6]).reshape(3,1)
+conf4 = np.array([0.0, 1.5, np.pi]).reshape(3,1)
+conf5 = np.array([-0.5, 1.0, 7*np.pi/6]).reshape(3,1)
+conf6 = np.array([-1.0, 0.5, 4*np.pi/3]).reshape(3,1)
+conf7 = np.array([-1.5, 0.0, 3*np.pi/2]).reshape(3,1)
+
+desired_configuration = [conf1, conf2, conf3, conf4, conf5, conf6, conf7]
 
 tasks = [ 
-          JointLimit("Joint Limit", joint_limit_1, 2),
-          Position2D("End-effector position", np.array([-0.5, 1.0]).reshape(2,1), 5)
+          Configuration2D("Configuration", np.array([1.0, 0.5, np.pi/2]).reshape(3,1), 5),
         ] 
+
+# Counter for switching the target
+counter = -3
 
 # Record the data for plotting
 error_end_effector = []
-joint_1_position = []
+error_end_effector_orientation = []
+robot_pose = {}
 
 # Simulation params
 dt = 1.0/60.0
@@ -47,14 +60,18 @@ PPy = []
 # Simulation initialization
 def init():
     global tasks
+    global counter
     line.set_data([], [])
     path.set_data([], [])
     point.set_data([], [])
-    tasks[1].setDesired((np.random.rand(2,1)*3-1.5)) # Random target
+    if counter < len(desired_configuration):
+        tasks[0].setDesired(desired_configuration[counter]) # Set target
+        counter += 1
     return line, path, point
 
 # Simulation loop
 def simulate(t):
+    global counter
     global tasks
     global robot
     global PPx, PPy
@@ -78,7 +95,7 @@ def simulate(t):
             # Task definition
             x_dot = tasks[i].getFeedforwardVelocity() + tasks[i].getGainMatrixK() @ tasks[i].getError()
             # Compute task velocity & Accumulate velocity
-            dq = dq + DLS(J_bar, damping_factor) @ (tasks[i].a * x_dot - Jacobian_padded @ dq)
+            dq = dq + weighted_DLS(J_bar, damping_factor, W) @ (tasks[i].a * x_dot - Jacobian_padded @ dq)
             # Update null-space projector
             P = P - np.linalg.pinv(J_bar) @ J_bar
         else:
@@ -87,8 +104,11 @@ def simulate(t):
     ###
 
     # Record data for plotting
-    error_end_effector.append(np.linalg.norm(tasks[1].getError()))
-    joint_1_position.append(robot.getJointPos(2)[0])
+    error_end_effector.append(np.linalg.norm(tasks[0].getError()[0:2]))
+    error_end_effector_orientation.append(abs(tasks[0].getError()[2]))
+
+    robot_pose['x'] = robot_pose.get('x', []) + [robot.getBasePose()[0,0]]
+    robot_pose['y'] = robot_pose.get('y', []) + [robot.getBasePose()[1,0]]
 
     # Update robot
     robot.update(dq, dt)
@@ -100,7 +120,7 @@ def simulate(t):
     PPx.append(PP[0,-1])
     PPy.append(PP[1,-1])
     path.set_data(PPx, PPy)
-    point.set_data(tasks[1].getDesired()[0], tasks[1].getDesired()[1])
+    point.set_data(tasks[0].getDesired()[0], tasks[0].getDesired()[1])
     # -- Mobile base
     eta = robot.getBasePose()
     veh.set_transform(trans.Affine2D().rotate(eta[2,0]) + trans.Affine2D().translate(eta[0,0], eta[1,0]) + ax.transData)
@@ -115,13 +135,22 @@ plt.show()
 # Plotting the end-effector path and distance to the obstacles
 tvec = np.arange(0, len(error_end_effector)*dt, dt)
 plt.figure()
-plt.plot(tvec, joint_1_position, label='q_1 (position of joint 1)', color='blue')
-plt.plot(tvec, error_end_effector, label='e_2 (end-effector position error)', color='orange')
-plt.plot(tvec, np.ones_like(tvec)*joint_limit_1[0], color='red', linestyle='--')
-plt.plot(tvec, np.ones_like(tvec)*joint_limit_1[1], color='red', linestyle='--')
+plt.plot(tvec, error_end_effector, label='e1 (end-effector position)', color='orange')
+plt.plot(tvec, error_end_effector_orientation, label='e2 (end-effector orientation)', color='blue')
 plt.xlabel('Time[s]')
 plt.ylabel('Error[1]')
 plt.title('Task-Priority control')
+plt.legend()
+plt.grid()
+plt.show()
+
+# Plotting path of the mobile base and end-effector
+plt.figure()
+plt.plot(robot_pose['x'], robot_pose['y'], label='Mobile base path', color='red')
+plt.plot(PPx, PPy, label='End-effector path', color='purple')
+plt.xlabel('x[m]')
+plt.ylabel('y[m]')
+plt.title('Path of the mobile base and end-effector')
 plt.legend()
 plt.grid()
 plt.show()

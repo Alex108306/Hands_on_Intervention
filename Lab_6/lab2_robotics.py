@@ -128,6 +128,22 @@ def DLS(A, damping):
     DLS_matrix = A.T @ np.linalg.inv(A @ A.T + damping**2 * np.identity(len(A)))
     return DLS_matrix  # Implement the formula to compute the DLS of matrix A.
 
+# Damped Least-Squares
+def weighted_DLS(A, damping, W):
+    """
+    Function computes the damped least-squares (DLS) solution to the matrix inverse problem.
+
+    Arguments:
+    A (Numpy array): matrix to be inverted
+    damping (double): damping factor
+    weight (Numpy array): weight matrix
+
+    Returns:
+    (Numpy array): inversion of the input matrix
+    """
+    DLS_weighted_matrix = np.linalg.inv(W) @ A.T @ np.linalg.inv(A @ np.linalg.inv(W) @ A.T + damping**2 * np.identity(len(A)))
+    return DLS_weighted_matrix  # Implement the formula to compute the DLS of matrix A.
+
 
 # Extract characteristic points of a robot projected on X-Y plane
 def robotPoints2D(T):
