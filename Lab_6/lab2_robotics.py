@@ -68,12 +68,13 @@ def kinematics(d, theta, a, alpha, Tb=np.eye(4)):
         n_1_T_n = DH(d[i], theta[i], a[i], alpha[i])
         # 2. Compute the resulting accumulated transformation from the base frame.
         T_0_n = T[-1] @ n_1_T_n
-        # 3. Append the computed transformation to T.
+        # Rotate to match the transformation from the base frame to the first joint of robot arm ( Rotation of -90 degrees around Z-axis)
         if i == 1:
             T_0_n = T_0_n @ np.array([[0, 1, 0, 0],
                                       [-1, 0, 0, 0],
                                       [0, 0, 1, 0],
                                       [0, 0, 0, 1]])
+        # 3. Append the computed transformation to T.
         T.append(T_0_n)
     return T
 

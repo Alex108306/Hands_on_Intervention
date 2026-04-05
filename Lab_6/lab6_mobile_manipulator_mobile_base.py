@@ -10,28 +10,28 @@ theta = np.array([0.2, 0.5, 0.2])          # rotation around Z-axis
 alpha = np.zeros(3)                        # rotation around X-axis
 a = np.array([0.4, 0.3, 0.2])              # displacement along X-axis
 revolute = np.array([True, True, True])    # flags specifying the type of joints
-robot = MobileManipulator(d, theta, a, alpha, revolute)
+robot = MobileManipulator(d, theta, a, alpha, revolute) # Create the robot model
 damping_factor = 0.1
 
 # Task definition
 W = np.diag([1.0, 1.0, 1.0, 1.0, 1.0])
 
-conf1 = np.array([1.5, 0.0, np.pi/2]).reshape(3,1)
-conf2 = np.array([1.0, 0.5, 2*np.pi/3]).reshape(3,1)
-conf3 = np.array([0.5, 1.0, 5*np.pi/6]).reshape(3,1)
-conf4 = np.array([0.0, 1.5, np.pi]).reshape(3,1)
-conf5 = np.array([-0.5, 1.0, 7*np.pi/6]).reshape(3,1)
-conf6 = np.array([-1.0, 0.5, 4*np.pi/3]).reshape(3,1)
-conf7 = np.array([-1.5, 0.0, 3*np.pi/2]).reshape(3,1)
+conf1 = np.array([1.5, 1.5, np.pi/4]).reshape(3,1)
+# conf2 = np.array([1.0, 0.5, np.pi]).reshape(3,1)
+conf3 = np.array([-1.5, -1.5, -np.pi/4]).reshape(3,1)
+# conf4 = np.array([0.0, 1.5, np.pi/6]).reshape(3,1)
+conf5 = np.array([1.5, -1.5, -3*np.pi/4]).reshape(3,1)
+# conf6 = np.array([-1.0, 0.5, -np.pi/3]).reshape(3,1)
+conf7 = np.array([-1.5, 1.5, 3*np.pi/4]).reshape(3,1)
 
-desired_configuration = [conf1, conf2, conf3, conf4, conf5, conf6, conf7]
+desired_configuration = [conf1, conf3, conf5, conf7]
 
 tasks = [ 
           Configuration2D("Configuration", np.array([1.0, 0.5, np.pi/2]).reshape(3,1), 5),
         ] 
 
 # Counter for switching the target
-counter = -3
+counter = -3 # Set -3 because the first 3 targets are used for initialization and will not be recorded in the data
 
 # Record the data for plotting
 error_end_effector = []
@@ -139,7 +139,7 @@ plt.plot(tvec, error_end_effector, label='e1 (end-effector position)', color='or
 plt.plot(tvec, error_end_effector_orientation, label='e2 (end-effector orientation)', color='blue')
 plt.xlabel('Time[s]')
 plt.ylabel('Error[1]')
-plt.title('Task-Priority control')
+plt.title('Task-Priority control (Simultaneous rotation and translation)')
 plt.legend()
 plt.grid()
 plt.show()
@@ -150,7 +150,13 @@ plt.plot(robot_pose['x'], robot_pose['y'], label='Mobile base path', color='red'
 plt.plot(PPx, PPy, label='End-effector path', color='purple')
 plt.xlabel('x[m]')
 plt.ylabel('y[m]')
-plt.title('Path of the mobile base and end-effector')
+plt.title('Path of the mobile base and end-effector \n (Simultaneous rotation and translation)')
 plt.legend()
 plt.grid()
 plt.show()
+
+# Save the data record
+with open('lab6_mobile_manipulator_rotate_forward.txt', 'w') as f:
+    f.write('Time[s],Mobile_base_x,Mobile_base_y,End_effector_x,End_effector_y\n')
+    for i in range(len(error_end_effector)):
+        f.write(f"{tvec[i]},{robot_pose['x'][i]},{robot_pose['y'][i]},{PPx[i]},{PPy[i]}\n")

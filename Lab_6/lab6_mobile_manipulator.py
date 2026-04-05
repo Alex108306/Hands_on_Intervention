@@ -10,7 +10,7 @@ theta = np.array([0.2, 0.5, 0.2])          # rotation around Z-axis
 alpha = np.zeros(3)                        # rotation around X-axis
 a = np.array([0.4, 0.3, 0.2])              # displacement along X-axis
 revolute = np.array([True, True, True])    # flags specifying the type of joints
-robot = MobileManipulator(d, theta, a, alpha, revolute)
+robot = MobileManipulator(d, theta, a, alpha, revolute) # Create the robot model
 damping_factor = 0.1
 
 # Task definition
